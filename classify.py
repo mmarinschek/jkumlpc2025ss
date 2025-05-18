@@ -9,16 +9,19 @@ import pandas as pd
 from tqdm import tqdm
 
 # Configuration
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))         # /path/to/jkumlpc2025ss
+BASE_DIR = os.path.dirname(CURRENT_DIR)                          # /path/to/
+
 DATA_DIR = os.path.join(BASE_DIR, "MLPC2025_classification")
 FEATURES_DIR = os.path.join(DATA_DIR, "audio_features")
 LABELS_DIR = os.path.join(DATA_DIR, "labels")
-OUTPUT_DIR = os.path.join(BASE_DIR, "trained_models")
+OUTPUT_DIR = os.path.join(BASE_DIR, "trained_models")         # Stays in jkumlpc2025ss now
 AUDIO_DIR = os.path.join(DATA_DIR, "audio")
+
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 FEATURE_KEYS = ["mfcc", "melspectrogram", "embeddings"]
 
-FAST_MODE = False
+FAST_MODE = True
 MAX_FILES = 10
 
 class HyperparameterSearchSpace:
