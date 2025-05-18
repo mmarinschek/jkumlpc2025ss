@@ -1,0 +1,8 @@
+scikit-learn
+pandas
+tqdm
+seaborn
+matplotlib
+torch
+librosa
+sounddevice

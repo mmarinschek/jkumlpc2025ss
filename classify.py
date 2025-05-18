@@ -21,7 +21,7 @@ AUDIO_DIR = os.path.join(DATA_DIR, "audio")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 FEATURE_KEYS = ["mfcc", "melspectrogram", "embeddings"]
 
-FAST_MODE = True
+FAST_MODE = False
 MAX_FILES = 10
 
 class HyperparameterSearchSpace:

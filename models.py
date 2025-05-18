@@ -406,7 +406,7 @@ class TorchLogisticRegressionModel(MultiLabelModel):
         def update_progress(epoch, score):
             progress_bar.set_description(f"Epoch {epoch}, ROC-AUC Micro: {score:.4f}")
 
-        early_stopping_monitor.progress_callback = update_progress;
+        early_stopping_monitor.progress_callback = update_progress
 
         for epoch in progress_bar:
             model.train()
