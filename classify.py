@@ -8,6 +8,11 @@ from utils import format_clickable_path
 import pandas as pd
 from tqdm import tqdm
 
+
+FAST_MODE = True
+REVERSE = True
+MAX_FILES = 10
+
 # Configuration
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))         # /path/to/jkumlpc2025ss
 BASE_DIR = os.path.dirname(CURRENT_DIR)                          # /path/to/
@@ -15,14 +20,14 @@ BASE_DIR = os.path.dirname(CURRENT_DIR)                          # /path/to/
 DATA_DIR = os.path.join(BASE_DIR, "MLPC2025_classification")
 FEATURES_DIR = os.path.join(DATA_DIR, "audio_features")
 LABELS_DIR = os.path.join(DATA_DIR, "labels")
-OUTPUT_DIR = os.path.join(BASE_DIR, "trained_models")         # Stays in jkumlpc2025ss now
+OUTPUT_DIR = os.path.join(BASE_DIR, "trained_models" if not FAST_MODE else "trained_models_fast")
+SUMMARY_DIR = os.path.join(CURRENT_DIR, "model_evaluation_summary" if not FAST_MODE else "model_evaluation_summary_fast")
 AUDIO_DIR = os.path.join(DATA_DIR, "audio")
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-FEATURE_KEYS = ["mfcc", "melspectrogram", "embeddings"]
+os.makedirs(SUMMARY_DIR, exist_ok=True)
 
-FAST_MODE = False
-MAX_FILES = 10
+FEATURE_KEYS = ["mfcc", "melspectrogram", "embeddings"]
 
 class HyperparameterSearchSpace:
     def __init__(self):
@@ -58,11 +63,11 @@ def main():
     
     #visualize_audio_features_labels(AUDIO_DIR, FEATURES_DIR, LABELS_DIR, common_ids, class_names, feature_key=DESIRED_FEATURE_KEY, n=1, top_k=10)
 
-    run_hyper_param_search(class_names, feature_datasets)
+    run_hyper_param_search(class_names, feature_datasets, REVERSE)
 
 
-def run_hyper_param_search(class_names, feature_datasets):
-    tracker = ModelEvaluationTracker(OUTPUT_DIR)
+def run_hyper_param_search(class_names, feature_datasets, reverse):
+    tracker = ModelEvaluationTracker(OUTPUT_DIR, SUMMARY_DIR)
     full_search_space = HyperparameterSearchSpace()
 
     filtered_search_space = [
@@ -70,6 +75,9 @@ def run_hyper_param_search(class_names, feature_datasets):
         for config, params, feature_key in full_search_space 
         if not tracker.already_evaluated(ModelResult.derive_model_name(config, params, feature_key))
     ]
+    
+    if reverse:
+        filtered_search_space = list(reversed(filtered_search_space))
 
     for config, params, feature_key in tqdm(filtered_search_space, desc="Hyperparameter Search Progress", total=len(filtered_search_space)):
         model_name = ModelResult.derive_model_name(config, params, feature_key)

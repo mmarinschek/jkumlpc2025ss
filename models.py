@@ -21,6 +21,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 from sklearn.metrics import roc_auc_score
+from sklearn.ensemble import HistGradientBoostingClassifier
 
 # ---------------------------
 # Hyperparameter Interfaces and Classes
@@ -108,6 +109,30 @@ class RandomForestParams(ModelParams):
             RandomForestParams(n_estimators=n, max_depth=md)
             for n in [10, 20, 50]
             for md in [5, 10, 15]
+        ]
+        
+@dataclass(frozen=True)
+class HistGradientBoostingParams(ModelParams):
+    max_iter: int = 100
+    learning_rate: float = 0.1
+    max_depth: int = 10
+    early_stopping: bool = True
+    random_state: int = 42
+    verbose: int = 0
+
+    def to_dict(self):
+        return asdict(self)
+
+    def to_filename_suffix(self):
+        return f"HGBT_iter{self.max_iter}_lr{self.learning_rate}_md{self.max_depth}"
+
+    @staticmethod
+    def grid() -> List["HistGradientBoostingParams"]:
+        return [
+            HistGradientBoostingParams(max_iter=iter_, learning_rate=lr, max_depth=md)
+            for iter_ in [50, 100]
+            for lr in [0.05, 0.1]
+            for md in [5, 10]
         ]
         
 @dataclass(frozen=True)
@@ -369,6 +394,42 @@ class RandomForestModel(MultiLabelModel):
 
     def hyperparameter_grid(self):
         return RandomForestParams.grid()
+
+class HistGradientBoostingModel(MultiLabelModel):
+    def create_base_estimator(self, params: HistGradientBoostingParams):
+        return HistGradientBoostingClassifier(**params.to_dict())
+
+    def fit(self, X_train, Y_train, params: HistGradientBoostingParams, feature_key: str, early_stopping_monitor: EarlyStoppingMonitor = None) -> ModelResult:
+        base_estimator = self.create_base_estimator(params)
+        classifiers = []
+
+        for i in tqdm(range(Y_train.shape[1]), desc="Training HGBT Classifiers"):
+            y = Y_train[:, i]
+            if np.unique(y).size < 2:
+                classifiers.append(None)
+                continue
+            clf = clone(base_estimator)
+            clf.fit(X_train, y)
+            classifiers.append(clf)
+
+        return ModelResult(classifiers, ModelConfig.HIST_GRADIENT_BOOSTING, params, feature_key)
+
+    def predict(self, model_result: ModelResult, X):
+        classifiers = model_result.trained_model
+        return np.column_stack([
+            np.zeros(X.shape[0], dtype=int) if clf is None else clf.predict(X)
+            for clf in classifiers
+        ])
+
+    def predict_proba(self, model_result: ModelResult, X):
+        classifiers = model_result.trained_model
+        return np.column_stack([
+            np.zeros(X.shape[0]) if clf is None else clf.predict_proba(X)[:, 1]
+            for clf in classifiers
+        ])
+
+    def hyperparameter_grid(self):
+        return HistGradientBoostingParams.grid()
     
 class TorchLogisticRegressionModel(MultiLabelModel):
     class TorchLRNet(nn.Module):
@@ -457,7 +518,8 @@ class ModelConfig(Enum):
     DUMMY = DummyModel()
     TORCH_LOGISTIC_REGRESSION = TorchLogisticRegressionModel()
     RANDOM_FOREST = RandomForestModel()
-
+    HIST_GRADIENT_BOOSTING = HistGradientBoostingModel()
+    
 #model fitting / training
 
 def train_multi_label_model(X_train, Y_train, X_val, Y_val, model_config: ModelConfig, params: ModelParams, feature_key: str) -> ModelResult:

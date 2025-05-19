@@ -85,9 +85,10 @@ class ModelEvaluationResult:
         }
         
 class ModelEvaluationTracker:
-    def __init__(self, output_dir):
+    def __init__(self, output_dir, summary_dir):
         self.output_dir = output_dir
-        self.summary_csv_path = os.path.join(output_dir, "model_evaluation_summary.csv")
+        self.summary_dir = summary_dir
+        self.summary_csv_path = os.path.join(summary_dir, "model_evaluation_summary.csv")
         self.evaluation_results = []
         self.existing_names = set()
 
