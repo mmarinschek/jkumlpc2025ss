@@ -136,24 +136,27 @@ class HistGradientBoostingParams(ModelParams):
         ]
         
 @dataclass(frozen=True)
-class SVMParams(ModelParams):
-    C: float = 1.0
-    kernel: str = "rbf"
-    gamma: str = "scale"
-    class_weight: str = "balanced"
+class SGDParams(ModelParams):
+    loss: str = "log_loss"  # Logistic Regression loss
+    penalty: str = "l2"
+    alpha: float = 0.0001
+    max_iter: int = 1000
+    random_state: int = 42
 
     def to_dict(self):
         return asdict(self)
 
     def to_filename_suffix(self):
-        return f"SVM_C{self.C}_kernel{self.kernel}_gamma{self.gamma}"
+        return f"SGD_loss{self.loss}_penalty{self.penalty}_alpha{self.alpha}_iter{self.max_iter}"
 
     @staticmethod
-    def grid() -> List["SVMParams"]:
+    def grid() -> List["SGDParams"]:
         return [
-            SVMParams(C=c, kernel=k)
-            for c in [0.1, 1.0]
-            for k in ["linear", "rbf"]
+            SGDParams(loss=l, penalty=p, alpha=a, max_iter=it)
+            for l in ["log_loss", "hinge"]  # Logistic Regression and Linear SVM
+            for p in ["l2", "l1"]
+            for a in [0.0001, 0.001]
+            for it in [500, 1000]
         ]
         
 @dataclass(frozen=True)
@@ -510,15 +513,17 @@ class TorchLogisticRegressionModel(MultiLabelModel):
     def supports_epochs(self): 
         return True
 
-class SVMModel(MultiLabelModel):
-    def create_base_estimator(self, params: SVMParams):
-        return SVC(probability=True, **params.to_dict())
+from sklearn.linear_model import SGDClassifier
 
-    def fit(self, X_train, Y_train, params: SVMParams, feature_key: str, early_stopping_monitor: EarlyStoppingMonitor = None) -> ModelResult:
+class SGDModel(MultiLabelModel):
+    def create_base_estimator(self, params: SGDParams):
+        return SGDClassifier(**params.to_dict())
+
+    def fit(self, X_train, Y_train, params: SGDParams, feature_key: str, early_stopping_monitor: EarlyStoppingMonitor = None) -> ModelResult:
         base_estimator = self.create_base_estimator(params)
         classifiers = []
 
-        for i in tqdm(range(Y_train.shape[1]), desc="Training SVM Classifiers"):
+        for i in tqdm(range(Y_train.shape[1]), desc="Training SGD Classifiers"):
             y = Y_train[:, i]
             if np.unique(y).size < 2:
                 classifiers.append(None)
@@ -527,7 +532,7 @@ class SVMModel(MultiLabelModel):
             clf.fit(X_train, y)
             classifiers.append(clf)
 
-        return ModelResult(classifiers, ModelConfig.SVM, params, feature_key)
+        return ModelResult(classifiers, ModelConfig.SGD, params, feature_key)
 
     def predict(self, model_result: ModelResult, X):
         classifiers = model_result.trained_model
@@ -544,7 +549,7 @@ class SVMModel(MultiLabelModel):
         ])
 
     def hyperparameter_grid(self):
-        return SVMParams.grid()
+        return SGDParams.grid()
 
 # ---------------------------
 # Model Config Enumeration
@@ -555,7 +560,9 @@ class ModelConfig(Enum):
     TORCH_LOGISTIC_REGRESSION = TorchLogisticRegressionModel()
     RANDOM_FOREST = RandomForestModel()
     HIST_GRADIENT_BOOSTING = HistGradientBoostingModel()
-    SVM = SVMModel()
+    #SVM = SVMModel() way too slow for our dataset, both in rbm and linear modes
+    SGD = SGDModel()
+
 
 #model fitting / training
 
