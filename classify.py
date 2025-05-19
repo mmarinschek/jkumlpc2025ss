@@ -9,8 +9,8 @@ import pandas as pd
 from tqdm import tqdm
 
 
-FAST_MODE = True
-REVERSE = True
+FAST_MODE = False
+REVERSE = False
 MAX_FILES = 10
 
 # Configuration

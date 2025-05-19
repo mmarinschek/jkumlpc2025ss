@@ -510,6 +510,42 @@ class TorchLogisticRegressionModel(MultiLabelModel):
     def supports_epochs(self): 
         return True
 
+class SVMModel(MultiLabelModel):
+    def create_base_estimator(self, params: SVMParams):
+        return SVC(probability=True, **params.to_dict())
+
+    def fit(self, X_train, Y_train, params: SVMParams, feature_key: str, early_stopping_monitor: EarlyStoppingMonitor = None) -> ModelResult:
+        base_estimator = self.create_base_estimator(params)
+        classifiers = []
+
+        for i in tqdm(range(Y_train.shape[1]), desc="Training SVM Classifiers"):
+            y = Y_train[:, i]
+            if np.unique(y).size < 2:
+                classifiers.append(None)
+                continue
+            clf = clone(base_estimator)
+            clf.fit(X_train, y)
+            classifiers.append(clf)
+
+        return ModelResult(classifiers, ModelConfig.SVM, params, feature_key)
+
+    def predict(self, model_result: ModelResult, X):
+        classifiers = model_result.trained_model
+        return np.column_stack([
+            np.zeros(X.shape[0], dtype=int) if clf is None else clf.predict(X)
+            for clf in classifiers
+        ])
+
+    def predict_proba(self, model_result: ModelResult, X):
+        classifiers = model_result.trained_model
+        return np.column_stack([
+            np.zeros(X.shape[0]) if clf is None else clf.predict_proba(X)[:, 1]
+            for clf in classifiers
+        ])
+
+    def hyperparameter_grid(self):
+        return SVMParams.grid()
+
 # ---------------------------
 # Model Config Enumeration
 # ---------------------------
@@ -519,7 +555,8 @@ class ModelConfig(Enum):
     TORCH_LOGISTIC_REGRESSION = TorchLogisticRegressionModel()
     RANDOM_FOREST = RandomForestModel()
     HIST_GRADIENT_BOOSTING = HistGradientBoostingModel()
-    
+    SVM = SVMModel()
+
 #model fitting / training
 
 def train_multi_label_model(X_train, Y_train, X_val, Y_val, model_config: ModelConfig, params: ModelParams, feature_key: str) -> ModelResult:
