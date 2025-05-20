@@ -123,9 +123,9 @@ def evaluate_model(model_result : ModelResult, X_test, Y_test, class_names, outp
         y_test_probs = model_result.predict_proba(X_test)
         auc_micro = roc_auc_score(Y_test, y_test_probs, average="micro")
         print(f"\nROC-AUC Micro (Primary Selection Metric): {auc_micro:.4f}")
-    except (ValueError, AttributeError):
+    except (ValueError, AttributeError) as e:
         auc_micro = None
-        print("ROC-AUC Micro could not be calculated.")
+        print("ROC-AUC Micro could not be calculated: "+str(e))
 
     balanced_acc = balanced_accuracy_score(y_test_flat, y_pred_flat)
     print(f"Balanced Accuracy (For Reporting Only): {balanced_acc:.4f}")

@@ -6,7 +6,7 @@ from typing import List, Tuple
 
 import numpy as np
 from sklearn.base import clone
-from joblib import dump
+from joblib import dump, load
 from utils import format_clickable_path
 from tqdm import tqdm
 from sklearn.linear_model import LogisticRegression
@@ -514,6 +514,7 @@ class TorchLogisticRegressionModel(MultiLabelModel):
         return True
 
 from sklearn.linear_model import SGDClassifier
+from scipy.special import expit  # for sigmoid
 
 class SGDModel(MultiLabelModel):
     def create_base_estimator(self, params: SGDParams):
@@ -543,10 +544,25 @@ class SGDModel(MultiLabelModel):
 
     def predict_proba(self, model_result: ModelResult, X):
         classifiers = model_result.trained_model
-        return np.column_stack([
-            np.zeros(X.shape[0]) if clf is None else clf.predict_proba(X)[:, 1]
-            for clf in classifiers
-        ])
+
+        probas = []
+
+        for clf in classifiers:
+            if clf is None:
+                probas.append(np.zeros(X.shape[0]))
+                continue
+
+            if hasattr(clf, "predict_proba"):
+                probs = clf.predict_proba(X)[:, 1]
+            elif hasattr(clf, "decision_function"):
+                scores = clf.decision_function(X)
+                probs = expit(scores)  # apply sigmoid to margin scores
+            else:
+                raise RuntimeError(f"Classifier of type {type(clf)} supports neither predict_proba nor decision_function.")
+
+            probas.append(probs)
+
+        return np.column_stack(probas)
 
     def hyperparameter_grid(self):
         return SGDParams.grid()
@@ -577,3 +593,43 @@ def save_model(model_result : ModelResult, output_dir):
     model_path = os.path.join(output_dir, filename)
     dump(model_result, model_path)
     print(f"Model saved to {format_clickable_path(model_path)}")
+    
+def load_model(output_dir, model_name) -> ModelResult:
+    """
+    Load a previously saved ModelResult object from disk.
+    
+    Args:
+        output_dir (str): Directory where the model is saved.
+        model_name (str): Name of the model (without .joblib extension).
+
+    Returns:
+        ModelResult: The deserialized model object.
+    """
+    print("Loading model : "+model_name)
+    model_path = os.path.join(output_dir, f"{model_name}.joblib")
+    
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file not found at {model_path}")
+
+    # hack model loading    
+    original_new = ModelConfig.__new__
+
+    def patched_new(cls, value):
+
+        for enum_member in cls:
+            if type(value) == type(enum_member.value):            
+                return enum_member                    
+            
+        raise ValueError(f"Cannot resolve ModelConfig for {value}. Please check the model name or type.")
+    
+    try:
+        ModelConfig.__new__ = staticmethod(patched_new)
+        model_result = load(model_path)
+    finally:
+        ModelConfig.__new__ = original_new  # Restore original behavior
+    
+    if not isinstance(model_result, ModelResult):
+        raise TypeError(f"Loaded object is not of type ModelResult: {type(model_result)}")
+    
+    print(f"Model loaded from {format_clickable_path(model_path)}")
+    return model_result
