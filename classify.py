@@ -49,17 +49,29 @@ def main():
     print(f"Detected {len(class_names)} classes.")
 
     common_ids = get_common_file_ids(FEATURES_DIR, LABELS_DIR)
+    
     if FAST_MODE:
         common_ids = common_ids[:MAX_FILES]
         print(f"Fast mode enabled: Using only {len(common_ids)} files.")
+        
+    train_ids, temp_ids = train_test_split(common_ids, test_size=0.3, random_state=42)
+    val_ids, test_ids = train_test_split(temp_ids, test_size=0.5, random_state=42)
 
     feature_datasets = {}
     for feature_key in FEATURE_KEYS:
-        X, Y = load_data(FEATURES_DIR, LABELS_DIR, common_ids, class_names, feature_key)
-        feature_datasets[feature_key] = (X, Y)
-        print(f"Feature key : {feature_key}, ")
-        print(f"Total Samples: {X.shape[0]}, Feature Dim: {X.shape[1]}, Classes: {Y.shape[1]}")
-        print(f"X shape: {X.shape}, Y shape: {Y.shape}")
+        print(f"Loading feature set: {feature_key}")
+
+        X_train, Y_train = load_data(FEATURES_DIR, LABELS_DIR, train_ids, class_names, feature_key)
+        X_val, Y_val = load_data(FEATURES_DIR, LABELS_DIR, val_ids, class_names, feature_key)
+        X_test, Y_test = load_data(FEATURES_DIR, LABELS_DIR, test_ids, class_names, feature_key)
+
+        feature_datasets[feature_key] = {
+            "train": (X_train, Y_train),
+            "val": (X_val, Y_val),
+            "test": (X_test, Y_test)
+        }
+
+        print(f"Train Samples shape: {X_train.shape[0]}, Val samples shape: {X_val.shape[0]}, Test samples shape: {X_test.shape[0]}")
     
     #visualize_audio_features_labels(AUDIO_DIR, FEATURES_DIR, LABELS_DIR, common_ids, class_names, feature_key=DESIRED_FEATURE_KEY, n=1, top_k=10)
 
@@ -83,11 +95,9 @@ def run_hyper_param_search(class_names, feature_datasets, reverse):
         model_name = ModelResult.derive_model_name(config, params, feature_key)
         print(f"\nTraining {model_name}")
         
-        X = feature_datasets[feature_key][0]
-        Y = feature_datasets[feature_key][1]
-        
-        X_train, X_temp, Y_train, Y_temp = train_test_split(X, Y, test_size=0.3, random_state=42)
-        X_test, X_val, Y_test, Y_val = train_test_split(X_temp, Y_temp, test_size=0.5, random_state=42)
+        X_train, Y_train = feature_datasets[feature_key]["train"]
+        X_val, Y_val     = feature_datasets[feature_key]["val"]
+        X_test, Y_test   = feature_datasets[feature_key]["test"]
 
         trained_model_result : ModelResult = train_multi_label_model(X_train, Y_train, X_val, Y_val, config, params, feature_key)
         save_model(trained_model_result, OUTPUT_DIR)
