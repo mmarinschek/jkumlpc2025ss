@@ -9,19 +9,6 @@ from utils import format_clickable_path
 from sklearn.metrics import roc_auc_score, balanced_accuracy_score
 
 
-class ModelEvaluationResult:
-    def __init__(self, model_name, roc_auc_micro, balanced_accuracy=None):
-        self.model_name = model_name
-        self.roc_auc_micro = roc_auc_micro
-        self.balanced_accuracy = balanced_accuracy
-
-    def to_dict(self):
-        return {
-            "Model Name": self.model_name,
-            "ROC-AUC Micro": self.roc_auc_micro,
-            "Balanced Accuracy": self.balanced_accuracy
-        }
-
 def plot_aggregated_confusion_matrix(Y_test, Y_pred, model_result, output_dir):
     y_true_flat = Y_test.flatten()
     y_pred_flat = Y_pred.flatten()
@@ -103,10 +90,20 @@ class ModelEvaluationTracker:
     def already_evaluated(self, model_name):
         return model_name in self.existing_names
 
-    def add_result(self, eval_result):
-        model_name = eval_result.model_name
-        self.evaluation_results.append(eval_result.to_dict())
-        self.existing_names.add(model_name)
+    def add_result(self, eval_result_val, eval_result_train):
+        row = {
+            "Model Name": eval_result_val.model_name,
+            "Best Epoch": eval_result_val.best_epoch,
+            "Train ROC-AUC Micro": eval_result_train.roc_auc_micro,
+            "Train Balanced Accuracy": eval_result_train.balanced_accuracy,
+            "Val ROC-AUC Micro": eval_result_val.roc_auc_micro,
+            "Val Balanced Accuracy": eval_result_val.balanced_accuracy,
+            "Gap ROC-AUC Micro": eval_result_train.roc_auc_micro - eval_result_val.roc_auc_micro,
+            "Gap Balanced Accuracy": eval_result_train.balanced_accuracy - eval_result_val.balanced_accuracy
+        }
+
+        self.evaluation_results.append(row)
+        self.existing_names.add(eval_result_val.model_name)
         self._save()
 
     def _save(self):

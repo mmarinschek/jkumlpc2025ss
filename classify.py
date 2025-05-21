@@ -142,8 +142,9 @@ def run_hyper_param_search(class_names, feature_datasets, reverse):
 
         trained_model_result : ModelResult = train_multi_label_model(X_train, Y_train, X_val, Y_val, config, params, feature_key)
         save_model(trained_model_result, CFG.OUTPUT_DIR)
-        eval_result = evaluate_model(trained_model_result, X_val, Y_val, class_names, CFG.OUTPUT_DIR)
-        eval_result.best_epoch = trained_model_result.best_epoch #if the model is epoch enabled, provide the best epoch here.
-        tracker.add_result(eval_result)
+        eval_result_train = evaluate_model(trained_model_result, X_train, Y_train, class_names, CFG.OUTPUT_DIR)
+        eval_result_val = evaluate_model(trained_model_result, X_val, Y_val, class_names, CFG.OUTPUT_DIR)
+        eval_result_val.best_epoch = trained_model_result.best_epoch #if the model is epoch enabled, provide the best epoch here.
+        tracker.add_result(eval_result_val, eval_result_train)
 if __name__ == "__main__":
     main()
