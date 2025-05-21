@@ -1,6 +1,7 @@
 import os
 from typing import List
 import numpy as np
+from sklearn.discriminant_analysis import StandardScaler
 from tqdm import tqdm
 
 def load_class_names(labels_dir):
@@ -19,8 +20,25 @@ def get_common_file_ids(features_dir, labels_dir):
         raise FileNotFoundError("No matching feature and label files found.")
     return common_ids
 
+class ScalerProvider:
+    def __init__(self, learn=True):
+        self.learn = learn
+        self.scalers = {}
 
-def load_all_features_and_labels(features_dir, labels_dir, common_ids, class_names, required_keys: List[str]):
+    def transform(self, key, data):
+        if key not in self.scalers:
+            if not self.learn:
+                raise ValueError(f"No scaler available for feature '{key}' in inference mode.")
+            scaler = StandardScaler()
+            scaler.fit(data)
+            self.scalers[key] = scaler
+        return self.scalers[key].transform(data)
+
+    def get_scalers(self):
+        return self.scalers
+
+
+def load_all_features_and_labels(features_dir, labels_dir, common_ids, class_names, required_keys: List[str], scaler_provider: ScalerProvider):
     all_labels = []
     all_feature_data = {k: [] for k in required_keys}
 
@@ -59,8 +77,12 @@ def load_all_features_and_labels(features_dir, labels_dir, common_ids, class_nam
             for key in required_keys:
                 all_feature_data[key].append(features_npz[key])
 
-    # Stack results
     Y = np.vstack(all_labels)
-    feature_dict = {key: np.vstack(all_feature_data[key]) for key in required_keys}
+
+    feature_dict = {}
+    for key in required_keys:
+        raw = np.vstack(all_feature_data[key])
+        normalized = scaler_provider.transform(key, raw)
+        feature_dict[key] = normalized
 
     return {"labels": Y, "features": feature_dict}

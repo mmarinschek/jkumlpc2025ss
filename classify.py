@@ -1,7 +1,8 @@
 import os
+from typing import List
 import numpy as np
 from sklearn.model_selection import train_test_split
-from data_loader import load_all_features_and_labels, load_class_names, get_common_file_ids
+from data_loader import ScalerProvider, load_all_features_and_labels, load_class_names, get_common_file_ids
 from models import ModelConfig, ModelResult, save_model, train_multi_label_model
 from evaluation import evaluate_model, ModelEvaluationTracker
 from visualization import visualize_audio_features_labels
@@ -45,7 +46,13 @@ class HyperparameterSearchSpace:
             if match(params)
         ]
         return filtered    
-
+from enum import Enum
+class DataSplitConfig:
+    def __init__(self, name: str, file_ids: List[str], fit_scaler: bool):
+        self.name = name
+        self.file_ids = file_ids
+        self.fit_scaler = fit_scaler
+        
 def main():
     class_names = load_class_names(CFG.LABELS_DIR)
     print(f"Detected {len(class_names)} classes.")
@@ -59,33 +66,42 @@ def main():
     train_ids, temp_ids = train_test_split(common_ids, test_size=0.3, random_state=CFG.RANDOM_SEED)
     val_ids, test_ids = train_test_split(temp_ids, test_size=0.5, random_state=CFG.RANDOM_SEED)
 
+    splits = [
+        DataSplitConfig("train", train_ids, fit_scaler=True),
+        DataSplitConfig("val", val_ids, fit_scaler=False),
+        DataSplitConfig("test", test_ids, fit_scaler=False),
+    ]
 
     simple_feature_keys = CFG.resolve_all_simple_feature_keys()
     
     print(f"Detected {len(simple_feature_keys)} simple feature keys: {simple_feature_keys}")
 
     feature_datasets = {}
-    splits = {
-        "train": train_ids,
-        "val": val_ids,
-        "test": test_ids
-    }
 
     for feature_key in simple_feature_keys:
         feature_datasets[feature_key] = {}
+        
+    scaler = ScalerProvider(learn=True)
 
-    for split_name, split_ids in splits.items():
-        print(f"\nLoading split: {split_name}, #files: {len(split_ids)}")
-
-        result = load_all_features_and_labels(CFG.FEATURES_DIR, CFG.LABELS_DIR, split_ids, class_names, required_keys=simple_feature_keys)
+    for split in splits:
+        print(f"\nLoading split: {split.name}, #files: {len(split.file_ids)}")
+        
+        scaler.learn = split.fit_scaler
+        
+        result = load_all_features_and_labels(
+            CFG.FEATURES_DIR, 
+            CFG.LABELS_DIR, 
+            split.file_ids, 
+            class_names, 
+            required_keys=simple_feature_keys, 
+            scaler_provider=scaler
+        )
 
         for feature_key in simple_feature_keys:
             X = result["features"][feature_key]
             Y = result["labels"]
-            feature_datasets[feature_key][split_name] = (X, Y)
-
-            if split_name == "train":
-                print(f"Feature: {feature_key} | Train Samples: {X.shape[0]} | Dim: {X.shape[1]}")
+            feature_datasets[feature_key][split.name] = (X, Y)
+            print(f"Feature: {feature_key} | Split: {split.name} | Samples: {X.shape[0]} | Dim: {X.shape[1]}")
     
     #visualize_audio_features_labels(AUDIO_DIR, FEATURES_DIR, LABELS_DIR, common_ids, class_names, feature_key=DESIRED_FEATURE_KEY, n=1, top_k=10)
 
