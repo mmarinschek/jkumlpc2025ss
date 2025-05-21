@@ -8,16 +8,16 @@ class ProjectConfig:
     RANDOM_SEED = 42
     
     FEATURE_KEY_SETS = {
-        "embeddings": ["embeddings"],
-        "mfcc": ["mfcc"],
-        "melspectrogram": ["melspectrogram"],
-        "mfcc_with_deltas": ["mfcc", "mfcc_delta", "mfcc_delta2"],
-        "baseaudio": ["flatness", "centroid", "flux", "energy", "power", "bandwidth", "contrast", "zerocrossingrate"],
-        "embeddings_plus_baseaudio": ["embeddings", "baseaudio"],
-        "embeddings_plus_mfcc_with_deltas": ["embeddings", "mfcc_with_deltas"],
-        "embeddings_plus_melspectrogram": ["embeddings", "melspectrogram"],
-        "embeddings_plus_mfcc_with_deltas_plus_melspectrogram": ["embeddings", "mfcc_with_deltas", "melspectrogram"],
-        "embeddings_plus_mfcc_with_deltas_plus_melspectrogram_plus_baseaudio": ["embeddings", "mfcc_with_deltas", "melspectrogram", "baseaudio"],
+        "embeddings": ["embeddings"]
+        # "mfcc": ["mfcc"],
+        # "melspectrogram": ["melspectrogram"],
+        # "mfcc_with_deltas": ["mfcc", "mfcc_delta", "mfcc_delta2"],
+        # "baseaudio": ["flatness", "centroid", "flux", "energy", "power", "bandwidth", "contrast", "zerocrossingrate"],
+        # "embeddings_plus_baseaudio": ["embeddings", "baseaudio"],
+        # "embeddings_plus_mfcc_with_deltas": ["embeddings", "mfcc_with_deltas"],
+        # "embeddings_plus_melspectrogram": ["embeddings", "melspectrogram"],
+        # "embeddings_plus_mfcc_with_deltas_plus_melspectrogram": ["embeddings", "mfcc_with_deltas", "melspectrogram"],
+        # "embeddings_plus_mfcc_with_deltas_plus_melspectrogram_plus_baseaudio": ["embeddings", "mfcc_with_deltas", "melspectrogram", "baseaudio"],
     }
     
     CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))

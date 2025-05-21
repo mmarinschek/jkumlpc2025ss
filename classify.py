@@ -94,7 +94,7 @@ def main():
 
 def run_hyper_param_search(class_names, feature_datasets, reverse):
     tracker = ModelEvaluationTracker(CFG.OUTPUT_DIR, CFG.SUMMARY_DIR)
-    full_search_space = HyperparameterSearchSpace().filter_by_model_type(ModelConfig.RANDOM_FOREST).filter_by_params(n_estimators=50, max_depth=5)
+    full_search_space = HyperparameterSearchSpace()#enable filter for best model trainings: .filter_by_model_type(ModelConfig.RANDOM_FOREST).filter_by_params(n_estimators=50, max_depth=5)
 
     filtered_search_space = [
         (config, params, feature_key) 
