@@ -1,0 +1,59 @@
+class_index,class_name,group,super_group,acoustic_group
+0,Airplane,Vehicle,Machine,Broadband Noise
+1,Alarm,Alarm,Machine,Impulse/Transient
+2,Beep/Bleep,Alarm,Machine,Impulse/Transient
+3,Bell,Alarm,Machine,Impulse/Transient
+4,Bicycle,Vehicle,Machine,Broadband Noise
+5,Bird Chirp,Bird,Animal/Nature,Animal Vocalizations
+6,Bus,Vehicle,Machine,Broadband Noise
+7,Car,Vehicle,Machine,Broadband Noise
+8,Cat Meow,Mammal,Animal/Nature,Animal Vocalizations
+9,Chainsaw,Tool,Machine,Broadband Noise
+10,Clapping,Human,Human,Impulse/Transient
+11,Cough,Human,Human,Human Speech
+12,Cow Moo,Mammal,Animal/Nature,Animal Vocalizations
+13,Cowbell,Instrument,Machine,Impulse/Transient
+14,Crying,Human,Human,Human Speech
+15,Dog Bark,Mammal,Animal/Nature,Animal Vocalizations
+16,Doorbell,Alarm,Machine,Impulse/Transient
+17,Drip,Nature,Animal/Nature,Impulse/Transient
+18,Drums,Instrument,Machine,Impulse/Transient
+19,Fire,Nature,Animal/Nature,Broadband Noise
+20,Footsteps,Human,Human,Impulse/Transient
+21,Guitar,Instrument,Machine,Harmonic/Melodic
+22,Hammer,Tool,Machine,Impulse/Transient
+23,Helicopter,Vehicle,Machine,Broadband Noise
+24,Hiccup,Human,Human,Human Speech
+25,Horn Honk,Alarm,Machine,Impulse/Transient
+26,Horse Neigh,Mammal,Animal/Nature,Animal Vocalizations
+27,Insect Buzz,Insect,Animal/Nature,Broadband Noise
+28,Jackhammer,Tool,Machine,Impulse/Transient
+29,Laughter,Human,Human,Human Speech
+30,Lawn Mower,Tool,Machine,Mechanical Rhythmic
+31,Motorcycle,Vehicle,Machine,Broadband Noise
+32,Piano,Instrument,Machine,Harmonic/Melodic
+33,Pig Oink,Mammal,Animal/Nature,Animal Vocalizations
+34,Power Drill,Tool,Machine,Broadband Noise
+35,Power Saw,Tool,Machine,Broadband Noise
+36,Rain,Weather,Animal/Nature,Broadband Noise
+37,Rooster Crow,Bird,Animal/Nature,Animal Vocalizations
+38,Saxophone,Instrument,Machine,Harmonic/Melodic
+39,Sewing Machine,Tool,Machine,Mechanical Rhythmic
+40,Sheep/Goat Bleat,Mammal,Animal/Nature,Animal Vocalizations
+41,Ship/Boat,Vehicle,Machine,Broadband Noise
+42,Shout,Human,Human,Human Speech
+43,Singing,Human,Human,Harmonic/Melodic
+44,Siren,Alarm,Machine,Harmonic/Melodic
+45,Sneeze,Human,Human,Human Speech
+46,Snoring,Human,Human,Broadband Noise
+47,Speech,Human,Human,Human Speech
+48,Stream/River,Nature,Animal/Nature,Broadband Noise
+49,Thunder,Weather,Animal/Nature,Broadband Noise
+50,Train,Vehicle,Machine,Broadband Noise
+51,Truck,Vehicle,Machine,Broadband Noise
+52,Trumpet,Instrument,Machine,Harmonic/Melodic
+53,Vacuum Cleaner,Tool,Machine,Broadband Noise
+54,Violin,Instrument,Machine,Harmonic/Melodic
+55,Washing Machine,Tool,Machine,Mechanical Rhythmic
+56,Waves,Nature,Animal/Nature,Broadband Noise
+57,Wind,Weather,Animal/Nature,Broadband Noise

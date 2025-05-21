@@ -1,4 +1,5 @@
 import os
+from typing import List
 import numpy as np
 from tqdm import tqdm
 
@@ -19,49 +20,47 @@ def get_common_file_ids(features_dir, labels_dir):
     return common_ids
 
 
-def load_data(features_dir, labels_dir, common_ids, class_names, feature_key):
-    all_features = []
+def load_all_features_and_labels(features_dir, labels_dir, common_ids, class_names, required_keys: List[str]):
     all_labels = []
+    all_feature_data = {k: [] for k in required_keys}
 
-    for file_id in tqdm(common_ids, desc="Loading file data for feature key : " + feature_key):
+    for file_id in tqdm(common_ids, desc="Loading all requested features and labels once"):
         features_npz = np.load(os.path.join(features_dir, f"{file_id}.npz"))
-        if feature_key not in features_npz:
-            raise KeyError(f"Feature key '{feature_key}' not found in '{file_id}.npz'.")
-        features = features_npz[feature_key]  # Shape: (time_steps, feature_dim)
-        num_steps = features.shape[0]
-
         labels_npz = np.load(os.path.join(labels_dir, f"{file_id}_labels.npz"))
 
-        # Determine max number of annotators across classes
+        # Validate keys
+        for key in required_keys:
+            if key not in features_npz:
+                raise KeyError(f"Feature key '{key}' missing in file '{file_id}.npz'")
+
+        num_steps = features_npz[required_keys[0]].shape[0]  # Assume all features aligned
+
         max_annotators = max(labels_npz[cls].shape[1] for cls in class_names if cls in labels_npz)
 
         for annotator_idx in range(max_annotators):
             label_matrix = []
             for cls in class_names:
-                if cls in labels_npz:
-                    cls_labels = labels_npz[cls]
-                    if cls_labels.shape[0] != num_steps:
-                        raise ValueError(f"Mismatch in time steps for class '{cls}' in file '{file_id}'.")
+                if cls not in labels_npz:
+                    raise KeyError(f"Label class '{cls}' missing in file '{file_id}'")
+                cls_labels = labels_npz[cls]
+                if cls_labels.shape[0] != num_steps:
+                    raise ValueError(f"Time mismatch for '{cls}' in '{file_id}'")
 
-                    # If this annotator exists for the class, use their labels
-                    if annotator_idx < cls_labels.shape[1]:
-                        annotator_labels = cls_labels[:, annotator_idx]
-                        binary_labels = (annotator_labels > 0).astype(int)
-                    else:
-                        # Annotator didn't provide data for this class; assume negative
-                        binary_labels = np.zeros(num_steps, dtype=int)
+                if annotator_idx < cls_labels.shape[1]:
+                    binary = (cls_labels[:, annotator_idx] > 0).astype(int)
                 else:
-                    raise KeyError(f"Class '{cls}' not found in labels for file '{file_id}'.")
-                
-                label_matrix.append(binary_labels)
+                    binary = np.zeros(num_steps, dtype=int)
 
+                label_matrix.append(binary)
             label_matrix = np.stack(label_matrix, axis=-1)
-
-            # Add this annotator's perspective to the dataset
-            all_features.append(features)
             all_labels.append(label_matrix)
 
-    X = np.vstack(all_features)  # Shape: (total_frames * annotators, feature_dim)
-    Y = np.vstack(all_labels)    # Shape: (total_frames * annotators, num_classes)
+            # Also collect all requested features for this annotator
+            for key in required_keys:
+                all_feature_data[key].append(features_npz[key])
 
-    return X, Y
+    # Stack results
+    Y = np.vstack(all_labels)
+    feature_dict = {key: np.vstack(all_feature_data[key]) for key in required_keys}
+
+    return {"labels": Y, "features": feature_dict}
