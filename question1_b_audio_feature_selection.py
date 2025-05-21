@@ -8,10 +8,11 @@ from sklearn.manifold import TSNE
 from sklearn.cluster import KMeans
 from sklearn.metrics import normalized_mutual_info_score, adjusted_rand_score
 
-from data_loader import load_class_names, get_common_file_ids, load_data
+from data_loader import load_all_features_and_labels, load_class_names, get_common_file_ids
 from configuration import ProjectConfig as CFG
 from utils import format_clickable_path
 import umap
+from sklearn.feature_selection import mutual_info_classif
 
 CFG.make_dirs()
 
@@ -121,45 +122,78 @@ def visualize_saved_projections(Y_full, class_names, feature_key, output_dir):
 
         plot_projection(X_proj, Y_single, class_names, class_colors, method.upper(), output_dir)
 
-def compute_label_alignment(X, Y, class_names, feature_key, output_dir):
+def compute_label_alignment(X, Y, feature_key):
     Y_single = np.argmax(Y, axis=1)
-    X_reduced = PCA(n_components=20, random_state=42).fit_transform(X)
+    
+    if X.shape[1] > 20 :
+        X_reduced = PCA(n_components=20, random_state=42).fit_transform(X)
+    else:
+        X_reduced = X
+        
     kmeans = KMeans(n_clusters=Y.shape[1], n_init=10, random_state=42)
     cluster_assignments = kmeans.fit_predict(X_reduced)
 
     nmi = normalized_mutual_info_score(Y_single, cluster_assignments)
     ari = adjusted_rand_score(Y_single, cluster_assignments)
-
-    print(f"Feature key: {feature_key}, NMI: {nmi:.4f}, ARI: {ari:.4f}")
-    result_path = os.path.join(output_dir, "clustering_label_alignment_metrics.csv")
-    pd.DataFrame([{"NMI": nmi, "ARI": ari}]).to_csv(result_path, index=False)
-    print(f"Metrics saved to {format_clickable_path(result_path)}")
-
-    save_projections(X, Y, output_dir)
-    visualize_saved_projections(Y, class_names, feature_key, output_dir)
+    
+    return {"feature_key": feature_key, "NMI": nmi, "ARI": ari}
 
 def main():
     class_names = load_class_names(CFG.LABELS_DIR)
     common_ids = get_common_file_ids(CFG.FEATURES_DIR, CFG.LABELS_DIR)
 
-    sample_file = os.path.join(CFG.FEATURES_DIR, f"{common_ids[0]}.npz")
-    with np.load(sample_file) as npz:
-        feature_keys = list(npz.keys())
+    set_feature_keys = CFG.FEATURE_KEY_SETS.keys()
+    simple_feature_keys = CFG.resolve_all_simple_feature_keys()
 
-    print(f"Detected feature keys: {feature_keys}")
+    print(f"Detected set feature keys: {set_feature_keys}")
+    
+    print(f"\nLoading all features and labels...")
+    result = load_all_features_and_labels(CFG.FEATURES_DIR, CFG.LABELS_DIR, common_ids, class_names, required_keys=simple_feature_keys)
+    
+    summary_path = os.path.join(CFG.SUMMARY_DIR, "feature_analysis_summary.csv")
+    os.makedirs(CFG.SUMMARY_DIR, exist_ok=True)
+    
+    if os.path.exists(summary_path):
+        summary_df = pd.read_csv(summary_path)
+    else:
+        summary_df = pd.DataFrame(columns=["feature_key", "NMI", "ARI"])
 
-    for feature_key in feature_keys:
-        print(f"\nProcessing feature key: {feature_key}")
+    for set_feature_key in set_feature_keys:
+        print(f"\nProcessing set feature key: {set_feature_key}")
+        
+        if set_feature_key in summary_df["feature_key"].values:
+            print(f"Skipping {set_feature_key}, already processed.")
+            continue
+        
+        resolved_simple_keys = CFG.resolve_feature_keys(set_feature_key)
+        
+        print(f"Resolved simple keys for set : {set_feature_key} -  {resolved_simple_keys}")
+        
         try:
-            X, Y = load_data(CFG.FEATURES_DIR, CFG.LABELS_DIR, common_ids, class_names, feature_key)
+            X = np.concatenate([result["features"][k] for k in resolved_simple_keys], axis=1)
+            Y = result["labels"]
             print(f"X shape: {X.shape}, Y shape: {Y.shape}")
 
-            output_dir = os.path.join(CFG.SUMMARY_DIR, f"feature_{feature_key}")
+            output_dir = os.path.join(CFG.SUMMARY_DIR, f"feature_{set_feature_key}")
             os.makedirs(output_dir, exist_ok=True)
 
-            compute_label_alignment(X, Y, class_names, feature_key, output_dir)
+            print(f"Compute label alignment metrics...")
+            label_metrics = compute_label_alignment(X, Y, set_feature_key)
+            print(f"Label alignment metrics for {set_feature_key}: NMI: {label_metrics['NMI']}, ARI: {label_metrics['ARI']}")
+            if set_feature_key in summary_df["feature_key"].values:
+                summary_df.loc[summary_df["feature_key"] == set_feature_key, ["NMI", "ARI"]] = label_metrics["NMI"], label_metrics["ARI"]
+            else:
+                summary_df.loc[len(summary_df)] = {
+                    "feature_key": set_feature_key,
+                    "NMI": label_metrics["NMI"],
+                    "ARI": label_metrics["ARI"]
+                }            
+            summary_df.to_csv(summary_path, index=False)
+
+            #save_projections(X, Y, output_dir)
+            #visualize_saved_projections(Y, class_names, set_feature_key, output_dir)
         except Exception as e:
-            print(f"Skipping {feature_key} due to error: {e}")
+            print(f"Skipping {set_feature_key} due to error: {e}")
 
 if __name__ == "__main__":
     main()
