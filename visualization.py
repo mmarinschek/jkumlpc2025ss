@@ -1,4 +1,7 @@
 import os
+import pandas as pd
+from typing import List
+
 import numpy as np
 import matplotlib.pyplot as plt
 import librosa
@@ -6,6 +9,9 @@ import librosa.display
 import sounddevice as sd
 from matplotlib.animation import FuncAnimation
 import time
+
+from data_loader import load_class_names
+from configuration import ProjectConfig as CFG
 
 def select_samples_with_most_labels(labels_dir, common_ids, top_n=10):
     label_counts = []
@@ -26,14 +32,144 @@ def select_samples_with_most_labels(labels_dir, common_ids, top_n=10):
     sorted_by_label_diversity = sorted(label_counts, key=lambda x: -x[1])
     return [idx for idx, _ in sorted_by_label_diversity[:top_n]]
 
+class AudioLabelSegment:
+    def __init__(self, class_name, annotator_index, onset_sec, offset_sec):
+        self.class_name = class_name
+        self.annotator_index = annotator_index
+        self.onset_sec = onset_sec
+        self.offset_sec = offset_sec
 
-def visualize_audio_features_labels(audio_dir, features_dir, labels_dir, common_ids, class_names, feature_key="mfcc", n=10, top_k=10, annotations_df=None):
+    def __repr__(self):
+        return (f"AudioLabelSegment(class={self.class_name}, "
+                f"annotator={self.annotator_index}, "
+                f"onset={self.onset_sec:.2f}s, offset={self.offset_sec:.2f}s)")
+
+def extract_segments_per_annotator(labels_npz_path, class_names, frame_duration_sec=0.120):
+    """
+    Extracts active segments (onset, offset) for each class and annotator.
+
+    Returns:
+        List of AudioLabelSegment objects.
+    """
+    labels_npz = np.load(labels_npz_path)
+    segments = []
+
+    for cls in class_names:
+        if cls not in labels_npz:
+            continue
+
+        label_matrix = labels_npz[cls]  # Shape: [time_steps, annotators]
+
+        for annotator_idx in range(label_matrix.shape[1]):
+            label_sequence = label_matrix[:, annotator_idx]
+            in_segment = False
+            start_idx = None
+
+            for i, val in enumerate(label_sequence):
+                if val > 0 and not in_segment:
+                    start_idx = i
+                    in_segment = True
+                elif val == 0 and in_segment:
+                    end_idx = i
+                    segments.append(AudioLabelSegment(
+                        class_name=cls,
+                        annotator_index=annotator_idx,
+                        onset_sec=start_idx * frame_duration_sec,
+                        offset_sec=end_idx * frame_duration_sec
+                    ))
+                    in_segment = False
+
+            if in_segment:
+                segments.append(AudioLabelSegment(
+                    class_name=cls,
+                    annotator_index=annotator_idx,
+                    onset_sec=start_idx * frame_duration_sec,
+                    offset_sec=len(label_sequence) * frame_duration_sec
+                ))
+
+    return segments
+
+def plot_segments_panel(ax, segments: List[AudioLabelSegment], duration_sec: float, title: str):
+    """
+    Plots only the used classes from the segments, sorted alphabetically.
+
+    Args:
+        ax: Matplotlib axis object.
+        segments: List of AudioLabelSegment instances.
+        duration_sec: Total duration of the audio.
+        title: Title of the subplot.
+    """
+    # Determine class set from segments
+    used_classes = sorted(set(seg.class_name for seg in segments))
+
+    ax.set_title(title)
+    ax.set_xlim(0, duration_sec)
+    ax.set_ylim(0, len(used_classes))
+    ax.set_yticks(np.arange(len(used_classes)) + 0.5)
+    ax.set_yticklabels(used_classes)
+
+    for seg in segments:
+        y_idx = used_classes.index(seg.class_name)
+        ax.axvspan(seg.onset_sec, seg.offset_sec,
+                   ymin=(y_idx / len(used_classes)),
+                   ymax=((y_idx + 1) / len(used_classes)),
+                   color='orange' if 'annotation' in title.lower() else 'steelblue',
+                   alpha=0.5)
+        label = seg.class_name
+        if seg.annotator_index is not None:
+            label += f" (A{seg.annotator_index})"
+
+def extract_annotation_segments_from_csv(annotations_csv_path: str, file_id: str) -> List[AudioLabelSegment]:
+    """
+    Extracts annotation segments from the original annotations.csv for a given file ID.
+
+    Args:
+        annotations_csv_path: Path to annotations.csv.
+        file_id: ID of the audio file (string or int).
+
+    Returns:
+        List of AudioLabelSegment instances representing annotated regions.
+    """
+    df = pd.read_csv(annotations_csv_path)
+
+    if "filename" not in df.columns or "text" not in df.columns or "onset" not in df.columns or "offset" not in df.columns:
+        raise ValueError("Required columns ['filename', 'text', 'onset', 'offset'] not found.")
+
+    df["filename_clean"] = df["filename"].str.replace(".mp3", "", regex=False)
+    file_rows = df[df["filename_clean"] == str(file_id)]
+
+    if file_rows.empty:
+        return []
+
+    segments = []
+    for _, row in file_rows.iterrows():        
+        class_name = row["text"].strip() if isinstance(row["text"], str) else "Unknown"
+        onset = float(row["onset"])
+        offset = float(row["offset"])
+        annotator_index = int(row["annotator"]) if "annotator" in row and pd.notna(row["annotator"]) else None
+
+        segments.append(AudioLabelSegment(class_name, annotator_index, onset, offset))
+
+    return segments
+
+def visualize_audio_features_labels(common_ids, n=10, feature_key="mfcc", display_annotations:bool=False):
+
+    audio_dir=CFG.AUDIO_DIR
+    features_dir=CFG.FEATURES_DIR
+    labels_dir=CFG.LABELS_DIR
 
     for idx in common_ids[:n]:
         frame_duration_sec = 0.120
         audio_path = os.path.join(audio_dir, f"{idx}.mp3")
         features_path = os.path.join(features_dir, f"{idx}.npz")
         labels_path = os.path.join(labels_dir, f"{idx}_labels.npz")
+
+        class_names = load_class_names(CFG.LABELS_DIR)
+
+        annotation_segments = extract_annotation_segments_from_csv(annotations_csv_path=os.path.join(CFG.DATA_DIR, "annotations.csv"),file_id=idx)
+        print(f"Annotation segments: {annotation_segments}")
+        label_segments = extract_segments_per_annotator(labels_path, class_names, frame_duration_sec)
+        print(f"Label segments: {label_segments}")
                 
         print(f"Processing ID: {idx} - Audio: {audio_path}, Features: {features_path}, Labels: {labels_path}")
 
@@ -55,70 +191,29 @@ def visualize_audio_features_labels(audio_dir, features_dir, labels_dir, common_
             continue
         features = features_npz[feature_key]
         time_steps = features.shape[0]
-        
-        # Load Labels
-        labels_npz = np.load(labels_path)
-                
-        label_matrix = np.stack([labels_npz[cls].mean(axis=-1) for cls in class_names], axis=-1)
-        label_binary = (label_matrix > 0).astype(int)
-
-        # Top-K Classes
-        class_activity = label_binary.sum(axis=0)
-        active_classes_idx = np.where(class_activity > 0)[0]
-
-        if len(active_classes_idx) == 0:
-            print(f"No active classes found for sample ID {idx}. Skipping visualization.")
-            continue
-
-        # Sort by activity and select top_k
-        sorted_active_idx = active_classes_idx[np.argsort(-class_activity[active_classes_idx])]
-        top_classes_idx = sorted_active_idx[:top_k]
-        top_classes = [class_names[i] for i in top_classes_idx]
 
         time_axis_audio = np.linspace(0, duration_sec, len(y))
         time_axis_features = np.arange(time_steps) * frame_duration_sec
 
-        fig, axs = plt.subplots(3, 1, figsize=(15, 9), sharex=True)
-        
+        fig, axs = plt.subplots(4, 1, figsize=(15, 10), sharex=True)
         fig.canvas.mpl_connect('close_event', on_close)
+        plt.subplots_adjust(left=0.25)  # Adjust as needed (0.25 works well)
 
-        # Static plots
+        # [0] Audio waveform
         axs[0].plot(time_axis_audio, y, color="gray")
         axs[0].set_title(f"Audio Waveform - Sample ID: {idx}")
         axs[0].set_ylabel("Amplitude")
 
+        # [1] Feature plot
         axs[1].plot(time_axis_features, np.mean(features, axis=1), color="blue")
         axs[1].set_title(f"Feature Timeline ({feature_key})")
         axs[1].set_ylabel("Mean Feature Value")
 
-        axs[2].imshow(
-            label_binary[:, top_classes_idx].T,
-            aspect='auto',
-            cmap='Blues',
-            extent=[0, duration_sec, 0, len(top_classes)],
-            vmin=0,
-            vmax=1
-        )
-        axs[2].set_yticks(np.arange(len(top_classes)) + 0.5)
-        axs[2].set_yticklabels(top_classes)
-        axs[2].set_title("Ground Truth Labels Over Time")
-        axs[2].set_xlabel("Time (seconds)")
+        # [2] Annotations (orange)
+        plot_segments_panel(axs[2], annotation_segments, duration_sec, "Human Annotations")
 
-        # 🔸 Add annotation spans if available
-        if annotations_df is not None:
-            row = annotations_df[annotations_df["file_id"] == int(idx)]
-            if not row.empty:
-                try:
-                    onsets = eval(row.iloc[0]["onset"])
-                    offsets = eval(row.iloc[0]["offset"])
-                    categories = eval(row.iloc[0]["categories"])
-                    for start, end, cat_str in zip(onsets, offsets, categories):
-                        cat_list = eval(cat_str)
-                        label = cat_list[0] if isinstance(cat_list, list) and cat_list else cat_str
-                        axs[2].axvspan(start, end, color="orange", alpha=0.3)
-                        axs[2].text((start + end) / 2, len(top_classes) + 0.5, label, ha="center", fontsize=8, rotation=45)
-                except Exception as e:
-                    print(f"Annotation overlay failed for {idx}: {e}")
+        # [3] Label Segments (blueish)
+        plot_segments_panel(axs[3], label_segments, duration_sec, "Per-Annotator Label Segments")
 
         # Animated cursor
         cursor_lines = [ax.axvline(0, color="red", linestyle="--") for ax in axs]

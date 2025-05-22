@@ -12,7 +12,7 @@ def load_class_names(labels_dir):
     return list(sample_labels.keys())
 
 
-def get_common_file_ids(features_dir, labels_dir):
+def get_common_file_ids(features_dir, labels_dir) -> List[str]:
     feature_ids = {f.split('.')[0] for f in os.listdir(features_dir) if f.endswith('.npz')}
     label_ids = {f.split('_')[0] for f in os.listdir(labels_dir) if f.endswith('.npz')}
     common_ids = sorted(feature_ids & label_ids)
