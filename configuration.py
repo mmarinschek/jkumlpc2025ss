@@ -8,9 +8,9 @@ class ProjectConfig:
     RANDOM_SEED = 42
     
     FEATURE_KEY_SETS = {
-        "embeddings": ["embeddings"]
-        # "mfcc": ["mfcc"],
-        # "melspectrogram": ["melspectrogram"],
+        "embeddings": ["embeddings"],
+        "mfcc": ["mfcc"],
+        "melspectrogram": ["melspectrogram"]
         # "mfcc_with_deltas": ["mfcc", "mfcc_delta", "mfcc_delta2"],
         # "baseaudio": ["flatness", "centroid", "flux", "energy", "power", "bandwidth", "contrast", "zerocrossingrate"],
         # "embeddings_plus_baseaudio": ["embeddings", "baseaudio"],

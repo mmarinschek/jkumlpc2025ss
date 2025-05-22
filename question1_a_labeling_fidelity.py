@@ -3,48 +3,47 @@ import pandas as pd
 from configuration import ProjectConfig as CFG
 from data_loader import get_common_file_ids
 
-CFG.make_dirs()
-
+# Paths
 ANNOTATIONS_FILE = os.path.join(CFG.DATA_DIR, "annotations.csv")
 OUTPUT_FILE = os.path.join(CFG.SUMMARY_DIR, "fidelity_annotation_check.csv")
+os.makedirs(CFG.SUMMARY_DIR, exist_ok=True)
 
-# Load the annotations CSV
+# Load data
 annotations_df = pd.read_csv(ANNOTATIONS_FILE)
+annotations_df["file_id"] = annotations_df["filename"].str.replace(".mp3", "", regex=False)
 
-# Load common ids (i.e. the ids for which we have features and labels)
+# Filter to only common file ids
 common_ids = set(get_common_file_ids(CFG.FEATURES_DIR, CFG.LABELS_DIR))
+annotations_df = annotations_df[annotations_df["file_id"].isin(common_ids)]
 
-# Filter annotations to those that match our usable dataset
-filtered_df = annotations_df[annotations_df['filename'].str.replace(".mp3", "").isin(common_ids)]
+# Select one row per file, randomly
+sampled_ids = annotations_df["file_id"].drop_duplicates().sample(n=30, random_state=CFG.RANDOM_SEED)
+sampled_df = annotations_df[annotations_df["file_id"].isin(sampled_ids)]
 
-# Group by file and sort by longest annotations
-grouped = (filtered_df.groupby("filename")
-            .agg({"text": lambda x: list(x),
-                  "categories": lambda x: list(x),
-                  "onset": lambda x: list(x),
-                  "offset": lambda x: list(x)})
-            .reset_index())
-
-# Unpack the list of categories into individual top-level labels
+# Group annotations per file
+grouped = (
+    sampled_df.groupby("file_id")
+    .agg({
+        "text": list,
+        "categories": list,
+        "onset": list,
+        "offset": list
+    })
+    .reset_index()
+)
 
 def extract_flat_labels(cat_list):
-    # Use eval to handle the stringified list (like "['Alarm']")
-    all_labels = []
+    flat = []
     for entry in cat_list:
         try:
-            all_labels.extend(eval(entry))
-        except:
+            flat.extend(eval(entry))  # Categories are stored as stringified lists
+        except Exception:
             continue
-    return list(set(all_labels))
+    return list(set(flat))
 
 grouped["mapped_labels"] = grouped["categories"].apply(extract_flat_labels)
+grouped["fidelity_rating"] = ""
+grouped["fidelity_comment"] = ""
 
-# Add column for manual rating (initially empty)
-grouped["fidelity_rating"] = ""  # e.g. Good / Acceptable / Poor
-grouped["fidelity_comment"] = ""  # optional free-form comment
-
-# Save to CSV
-os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
 grouped.to_csv(OUTPUT_FILE, index=False)
-
-print(f"Saved fidelity inspection template to: {OUTPUT_FILE}")
+print(f"Fidelity inspection template saved to: {OUTPUT_FILE}")

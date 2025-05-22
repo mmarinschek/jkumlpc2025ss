@@ -39,3 +39,4 @@ model_evaluation_summary/feature_mfcc_delta2/X_sub.npy
 model_evaluation_summary/feature_mfcc_delta2/X_tsne.npy
 model_evaluation_summary/feature_mfcc_delta2/X_umap.npy
 model_evaluation_summary/feature_mfcc_delta2/Y_sub.npy
+.DS_Store

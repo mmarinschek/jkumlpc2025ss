@@ -27,15 +27,10 @@ def select_samples_with_most_labels(labels_dir, common_ids, top_n=10):
     return [idx for idx, _ in sorted_by_label_diversity[:top_n]]
 
 
-def visualize_audio_features_labels(audio_dir, features_dir, labels_dir, common_ids, class_names, feature_key="mfcc", n=10, top_k=10):
-    
-    interesting_ids = select_samples_with_most_labels(labels_dir, common_ids, top_n=top_k)
-    print(f"Selected interesting IDs based on label diversity: {interesting_ids}")
-    
-    for idx in interesting_ids[:n]:
-        
-        frame_duration_sec = 0.120 #constant frame length defined by the input data
-        
+def visualize_audio_features_labels(audio_dir, features_dir, labels_dir, common_ids, class_names, feature_key="mfcc", n=10, top_k=10, annotations_df=None):
+
+    for idx in common_ids[:n]:
+        frame_duration_sec = 0.120
         audio_path = os.path.join(audio_dir, f"{idx}.mp3")
         features_path = os.path.join(features_dir, f"{idx}.npz")
         labels_path = os.path.join(labels_dir, f"{idx}_labels.npz")
@@ -109,7 +104,23 @@ def visualize_audio_features_labels(audio_dir, features_dir, labels_dir, common_
         axs[2].set_title("Ground Truth Labels Over Time")
         axs[2].set_xlabel("Time (seconds)")
 
-        # Cursor lines
+        # 🔸 Add annotation spans if available
+        if annotations_df is not None:
+            row = annotations_df[annotations_df["file_id"] == int(idx)]
+            if not row.empty:
+                try:
+                    onsets = eval(row.iloc[0]["onset"])
+                    offsets = eval(row.iloc[0]["offset"])
+                    categories = eval(row.iloc[0]["categories"])
+                    for start, end, cat_str in zip(onsets, offsets, categories):
+                        cat_list = eval(cat_str)
+                        label = cat_list[0] if isinstance(cat_list, list) and cat_list else cat_str
+                        axs[2].axvspan(start, end, color="orange", alpha=0.3)
+                        axs[2].text((start + end) / 2, len(top_classes) + 0.5, label, ha="center", fontsize=8, rotation=45)
+                except Exception as e:
+                    print(f"Annotation overlay failed for {idx}: {e}")
+
+        # Animated cursor
         cursor_lines = [ax.axvline(0, color="red", linestyle="--") for ax in axs]
         
         def start_playback_with_cursor_sync():
