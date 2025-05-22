@@ -4,7 +4,7 @@ from typing import List
 class ProjectConfig:
     FAST_MODE = False
     MAX_FILES = 10
-    REVERSE = False
+    REVERSE = True
     RANDOM_SEED = 42
     
     FEATURE_KEY_SETS = {

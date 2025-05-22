@@ -1,10 +1,10 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from configuration import ProjectConfig as CFG
 import os
 
-# Adjust path if needed
-csv_path = "jkumlpc2025ss/model_evaluation_summary/model_evaluation_summary.csv"
+csv_path = CFG.SUMMARY_DIR+"/model_evaluation_summary.csv"
 df = pd.read_csv(csv_path)
 
 # Preprocess
@@ -12,6 +12,9 @@ df["Best Epoch"] = df["Best Epoch"].fillna(0)
 df["Model Type"] = df["Model Name"].apply(lambda x: x.split('_')[0])
 df["Feature Type"] = df["Model Name"].str.extract(r'(mfcc|melspectrogram|embeddings)', expand=False)
 df["Params"] = df["Model Name"].str.replace(r'^.*?_', '', regex=True)
+
+#Model Name,Best Epoch,Train ROC-AUC Micro,Train Balanced Accuracy,Val ROC-AUC Micro,Val Balanced Accuracy,Gap ROC-AUC Micro,Gap Balanced Accuracy
+
 
 # Marker styles for feature types
 marker_styles = {
@@ -30,8 +33,8 @@ plt.figure(figsize=(14, 10))
 # Plot each point
 for _, row in df.iterrows():
     plt.scatter(
-        row["ROC-AUC Micro"],
-        row["Balanced Accuracy"],
+        row["Gap Balanced Accuracy"],
+        row["Val Balanced Accuracy"],
         marker=marker_styles.get(row["Feature Type"], "o"),
         color=model_color_map.get(row["Model Type"], "gray"),
         s=120,
@@ -39,8 +42,8 @@ for _, row in df.iterrows():
         linewidth=0.7
     )
     plt.text(
-        row["ROC-AUC Micro"] + 0.001,
-        row["Balanced Accuracy"] + 0.001,
+        row["Gap Balanced Accuracy"] + 0.001,
+        row["Val Balanced Accuracy"] + 0.001,
         row["Params"],
         fontsize=8,
         alpha=0.7
@@ -59,9 +62,9 @@ legend_elements = [
 plt.legend(handles=legend_elements, title="Feature Type / Model Type", bbox_to_anchor=(1.05, 1), loc='upper left')
 
 # Labels and layout
-plt.title("Model Performance: ROC-AUC Micro vs. Balanced Accuracy", fontsize=14)
-plt.xlabel("ROC-AUC Micro", fontsize=12)
-plt.ylabel("Balanced Accuracy", fontsize=12)
+plt.title("Model Performance: Gap Balanced Accuracy vs. Val Balanced Accuracy", fontsize=14)
+plt.xlabel("Gap Balanced Accuracy", fontsize=12)
+plt.ylabel("Val Balanced Accuracy", fontsize=12)
 plt.grid(True)
 plt.tight_layout()
 

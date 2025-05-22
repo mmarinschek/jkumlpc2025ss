@@ -5,23 +5,21 @@ from enum import Enum
 from typing import List, Tuple
 
 import numpy as np
-from sklearn.base import clone
-from joblib import dump, load
-from utils import format_clickable_path
-from tqdm import tqdm
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.base import BaseEstimator
-from sklearn.neural_network import MLPClassifier
-from sklearn.svm import SVC
-from sklearn.dummy import DummyClassifier
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from joblib import dump, load
+from sklearn.base import clone
+from sklearn.dummy import DummyClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
-from sklearn.metrics import roc_auc_score
-from sklearn.ensemble import HistGradientBoostingClassifier
+
+from utils import format_clickable_path
+
 
 # ---------------------------
 # Hyperparameter Interfaces and Classes
@@ -633,3 +631,14 @@ def load_model(output_dir, model_name) -> ModelResult:
     
     print(f"Model loaded from {format_clickable_path(model_path)}")
     return model_result
+
+
+def extract_feature_key(model_name: str, valid_keys) -> str:
+    """
+    Extracts the feature key from the model name by matching against known valid feature keys.
+    Assumes feature key is the suffix after the last underscore.
+    """
+    for key in valid_keys:
+        if model_name.endswith(f"_{key}"):
+            return key
+    raise ValueError(f"Could not extract valid feature key from model name '{model_name}'")

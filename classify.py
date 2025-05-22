@@ -62,7 +62,15 @@ def main():
     if CFG.FAST_MODE:
         common_ids = common_ids[:CFG.MAX_FILES]
         print(f"Fast mode enabled: Using only {len(common_ids)} files.")
-        
+
+    feature_datasets = load_data_in_splits(class_names, create_splits(common_ids))
+
+    #visualize_audio_features_labels(AUDIO_DIR, FEATURES_DIR, LABELS_DIR, common_ids, class_names, feature_key=DESIRED_FEATURE_KEY, n=1, top_k=10)
+
+    run_hyper_param_search(class_names, feature_datasets, CFG.REVERSE)
+
+def create_splits(common_ids) -> List[DataSplitConfig]:
+
     train_ids, temp_ids = train_test_split(common_ids, test_size=0.3, random_state=CFG.RANDOM_SEED)
     val_ids, test_ids = train_test_split(temp_ids, test_size=0.5, random_state=CFG.RANDOM_SEED)
 
@@ -72,28 +80,27 @@ def main():
         DataSplitConfig("test", test_ids, fit_scaler=False),
     ]
 
+    return splits
+
+def load_data_in_splits(class_names, splits):
+
     simple_feature_keys = CFG.resolve_all_simple_feature_keys()
-    
     print(f"Detected {len(simple_feature_keys)} simple feature keys: {simple_feature_keys}")
-
     feature_datasets = {}
-
     for feature_key in simple_feature_keys:
         feature_datasets[feature_key] = {}
-        
     scaler = ScalerProvider(learn=True)
-
     for split in splits:
         print(f"\nLoading split: {split.name}, #files: {len(split.file_ids)}")
-        
+
         scaler.learn = split.fit_scaler
-        
+
         result = load_all_features_and_labels(
-            CFG.FEATURES_DIR, 
-            CFG.LABELS_DIR, 
-            split.file_ids, 
-            class_names, 
-            required_keys=simple_feature_keys, 
+            CFG.FEATURES_DIR,
+            CFG.LABELS_DIR,
+            split.file_ids,
+            class_names,
+            required_keys=simple_feature_keys,
             scaler_provider=scaler
         )
 
@@ -102,10 +109,7 @@ def main():
             Y = result["labels"]
             feature_datasets[feature_key][split.name] = (X, Y)
             print(f"Feature: {feature_key} | Split: {split.name} | Samples: {X.shape[0]} | Dim: {X.shape[1]}")
-    
-    #visualize_audio_features_labels(AUDIO_DIR, FEATURES_DIR, LABELS_DIR, common_ids, class_names, feature_key=DESIRED_FEATURE_KEY, n=1, top_k=10)
-
-    run_hyper_param_search(class_names, feature_datasets, CFG.REVERSE)
+    return feature_datasets
 
 
 def run_hyper_param_search(class_names, feature_datasets, reverse):
@@ -126,7 +130,6 @@ def run_hyper_param_search(class_names, feature_datasets, reverse):
         print(f"\nTraining {model_name} for features {feature_key} with {config.name} and params: {params}")
         
         resolved_keys = CFG.resolve_feature_keys(feature_key)
-        
         print(f"Resolved simple feature keys for model training: {resolved_keys}")
 
         X_train = np.concatenate([feature_datasets[k]["train"][0] for k in resolved_keys], axis=1)

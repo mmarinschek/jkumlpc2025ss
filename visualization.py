@@ -152,7 +152,7 @@ def extract_annotation_segments_from_csv(annotations_csv_path: str, file_id: str
 
     return segments
 
-def visualize_audio_features_labels(common_ids, n=10, feature_key="mfcc", display_annotations:bool=False):
+def visualize_audio_features_labels(common_ids, n=10, feature_key="mfcc", prediction_segments = None, display_annotations:bool=False):
 
     audio_dir=CFG.AUDIO_DIR
     features_dir=CFG.FEATURES_DIR
@@ -195,7 +195,19 @@ def visualize_audio_features_labels(common_ids, n=10, feature_key="mfcc", displa
         time_axis_audio = np.linspace(0, duration_sec, len(y))
         time_axis_features = np.arange(time_steps) * frame_duration_sec
 
-        fig, axs = plt.subplots(4, 1, figsize=(15, 10), sharex=True)
+        nrows = 2
+
+        if display_annotations:
+            nrows += 1
+
+        #segments are always shown
+        nrows +=1
+
+        if prediction_segments is not None:
+            nrows += 1
+
+        fig, axs = plt.subplots(nrows, 1, figsize=(15, 10), sharex=True)
+
         fig.canvas.mpl_connect('close_event', on_close)
         plt.subplots_adjust(left=0.25)  # Adjust as needed (0.25 works well)
 
@@ -209,11 +221,18 @@ def visualize_audio_features_labels(common_ids, n=10, feature_key="mfcc", displa
         axs[1].set_title(f"Feature Timeline ({feature_key})")
         axs[1].set_ylabel("Mean Feature Value")
 
-        # [2] Annotations (orange)
-        plot_segments_panel(axs[2], annotation_segments, duration_sec, "Human Annotations")
+        current_row = 2
 
-        # [3] Label Segments (blueish)
-        plot_segments_panel(axs[3], label_segments, duration_sec, "Per-Annotator Label Segments")
+        if display_annotations:
+            plot_segments_panel(axs[current_row], annotation_segments, duration_sec, "Human Annotations")
+            current_row += 1
+
+        plot_segments_panel(axs[current_row], label_segments, duration_sec, "Label Segments")
+        current_row += 1
+
+        if prediction_segments is not None:
+            plot_segments_panel(axs[current_row], prediction_segments, duration_sec, "Predicted Segments")
+            current_row += 1
 
         # Animated cursor
         cursor_lines = [ax.axvline(0, color="red", linestyle="--") for ax in axs]
