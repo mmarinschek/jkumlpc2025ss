@@ -8,7 +8,7 @@ from tqdm import tqdm
 from configuration import ProjectConfig as CFG
 from data_loader import load_class_names, get_common_file_ids
 from classify import load_data_in_splits, create_splits, DataSplitConfig
-from jkumlpc2025ss.models import extract_feature_key
+from models import extract_feature_key
 from models import load_model
 from evaluation import evaluate_model
 
